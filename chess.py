@@ -41,26 +41,25 @@ def check_is_move_and_warn(move : str) -> bool:
     result = check_is_move(move)
 
     if not result:
-        print("Invalid move format found.")
+        print(f'Move {move} is not a valid move format.')
 
     return result
 
 
 
 def split_string_list(string_list : list, *separators):
-    '''Splits a list of strings into a larger list of strings using the given separators.'''
+    """Splits a list of strings into a larger list of strings using the given separators."""
 
     #Takes a list of strings and returns a list of lists, where each list is a string split by a given separator.
-    list_split_before_flattening = lambda list, separator : [element.split(separator) for element in list]
+    list_split_before_flattening = lambda l, separator : [element.split(separator) for element in l]
 
     #Flattens a list of lists.
-    flatten = lambda list : [subelement for element in list for subelement in element]
+    flatten = lambda l : [subelement for element in l for subelement in element]
 
     #Splits a list of strings into a larger list of strings using the given separator.
-    lsplit = lambda list, separator : flatten(list_split_before_flattening(list, separator))
+    lsplit = lambda l, separator : flatten(list_split_before_flattening(l, separator))
 
     for separator in separators:
-
         string_list = lsplit(string_list, separator)
     
     return string_list
@@ -74,38 +73,63 @@ class Chess_moves:
 
     list_of_moves = []
 
-
     
     def __init__(self, *moves_in_algebraic_notation : str):
         """Initializer can be initialized with one string of moves or multiple. Initializer can directly accept strings of unformatted PGN from Chess.com."""
 
-        for move_sequence in moves_in_algebraic_notation:
-
-            formatted_move_sequence : list = split_string_list([move_sequence], ',', ' ', '\n', '\r')
-            formatted_move_sequence = [move for move in formatted_move_sequence if check_is_move(move)]
-            self.list_of_moves = self.list_of_moves + formatted_move_sequence
+        formatted_move_sequence : list = split_string_list(moves_in_algebraic_notation, ',', ' ', '\n', '\r')
+        self.list_of_moves = [move for move in formatted_move_sequence if check_is_move(move)]
 
 
     
     def __getitem__(self, key):
         """Extends standard list behaviour to Chess_moves."""
-        return self.list_of_moves[key]
 
+        #If key is numeric, subscribing the list should yield a single move, necessitating the substitution of a single argument into the Chess_moves initializer.
+        try:
+            assert(check_is_move(self.list_of_moves[key]))
+            return Chess_moves(self.list_of_moves[key])
+        
+        #Otherwise, the key is a slice. And the list will yield multiple moves for multiple arguments.
+        except:
+            return Chess_moves(*self.list_of_moves[key])
 
     
+
     def __setitem__(self, key, value):
         """Extends standard list behaviour to Chess_moves."""
 
-        if not check_is_move_and_warn(value):
-            return
-
-        self.list_of_moves[key] = value
+        #If the value is multiple moves, a check will need to be performed on each move to ensure it's formatted.
+        if not hasattr(value, '__iter__'):
+            if check_is_move_and_warn(value):
+                self.list_of_moves[key] = value
+                
+        else:
+            if all(check_is_move_and_warn(move) for move in value):
+                self.list_of_moves[key] = value
 
 
     
     def __delitem__(self, key):
         """Extends standard list behaviour to Chess_moves."""
+
         del self.list_of_moves[key]
+
+    
+
+    def __str__(self):
+        """Ensures print and other str operations return the moves rather than the memory address."""
+
+        l = self.list_of_moves
+
+        #Split the moves into white moves and black moves then combine them by turn.
+        white, black = l[0::2], l[1::2]
+        turns = [f'{white[turn]} ' + f'{black[turn]}' if turn < len(black) \
+                 else f'{white[turn]}' for turn in range(len(white))]
+        
+        #Add numbering to the start of turns.
+        formatted_turns = ' '.join( [f'{turn + 1}. {turns[turn]}' for turn in range(len(turns))] )
+        return(formatted_turns)
 
 
     
@@ -143,7 +167,6 @@ class Chess_game(Chess_moves):
 
         #Generate the list of game moves using base class init.
         super().__init__(*formatted_game_data)
-
 
 
         #Find strings with relevant data.
@@ -193,9 +216,24 @@ class Chess_game(Chess_moves):
         final_date_data = date_data[date_tag_index + 1].split('.')
 
         self.date = dict()
-        self.date['Year'] = final_date_data[0]
-        self.date['Month'] = final_date_data[1]
-        self.date['Day'] = final_date_data[2]
+        self.date['Year'], self.date['Month'], self.date['Day'] = final_date_data[0], final_date_data[1], final_date_data[2]
+
+
+
+    def __str__(self):
+
+        my_colour = 'White' if self.i_was_white else 'Black'
+        win_state = 'victory' if self.did_i_win else 'defeat'
+        game_summary = 'was drawn' if self.ending_tag == 'drawn' else \
+            f'ended in {win_state} by {self.ending_tag}'
+        moves = super().__str__()
+
+        output : str =  f'''{self.date['Day']}/{self.date['Month']}/{self.date['Year']}
+Game as {my_colour} {game_summary}. Opponent ELO was {self.opponent_elo}
+Move details:
+{moves}'''
+
+        return output
 
 
 
@@ -254,11 +292,5 @@ if __name__ == '__main__':
     Qxg2 9. Rh2 Qxg1# 0-1'''
 
     game = Chess_game(chess_data)
-
-    print(chess_data)
-    print(game.i_was_white)
-    print(game.did_i_win)
-    print(game.ending_tag)
-    print(game.date)
-    print(game.list_of_moves)
+    print(game)
 
