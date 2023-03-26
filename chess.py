@@ -14,7 +14,7 @@ def check_is_move(move : str) -> bool:
 
 
     #Check to see if the move has enough characters to constitute a move.
-    if len(move) >= 2:
+    if len(move) < 2:
         return False
 
     #A separate check to see if the move describes castling.
@@ -26,7 +26,7 @@ def check_is_move(move : str) -> bool:
         return False
 
     #Check if the back ends with a valid coordinate (i.e. 'h2', 'a4', etc.).
-    if ord(move[-2]) not in range(97, 105) and ord(move[-1]) not in range(49, 57):
+    if ord(move[-2]) not in range(97, 105) or ord(move[-1]) not in range(49, 57):
         return False
     
     return True
@@ -138,11 +138,12 @@ class Chess_game(Chess_moves):
     def __init__(self, game_data : str):
         """Initializer intended to be initialized with chess data from Chess.com"""
 
-        formatted_game_data : list = split_string_list('[', ']')
+        formatted_game_data : list = split_string_list([game_data], '[', ']')
 
 
         #Generate the list of game moves using base class init.
         super().__init__(*formatted_game_data)
+
 
 
         #Find strings with relevant data.
@@ -174,23 +175,24 @@ class Chess_game(Chess_moves):
 
         #Look for details about how the game ended in the termination phrase.
         if 'drawn' in termination_phrase:
-            ending_tag = 'draw'
+            self.ending_tag = 'draw'
 
         elif 'time' in termination_phrase:
-            ending_tag = 'time'
+            self.ending_tag = 'time'
 
         elif 'checkmate' in termination_phrase:
-            ending_tag = 'checkmate'
+            self.ending_tag = 'checkmate'
 
         else:
-            ending_tag = 'resignation'
+            self.ending_tag = 'resignation'
         
 
         #Derive date details from date data. The details must appear immediately after a date tag.
-        date_data : list = split_string_list(date_phrase, '"')
+        date_data : list = split_string_list([date_phrase], '"')
         date_tag_index : int = next(i for i in range(len(date_data)) if '' in date_data[i])
         final_date_data = date_data[date_tag_index + 1].split('.')
 
+        self.date = dict()
         self.date['Year'] = final_date_data[0]
         self.date['Month'] = final_date_data[1]
         self.date['Day'] = final_date_data[2]
@@ -233,5 +235,30 @@ class decision_tree:
 
 
 if __name__ == '__main__':
-    pass
+    
+    chess_data = '''[Event "Live Chess"]
+    [Site "Chess.com"]
+    [Date "2022.11.06"]
+    [Round "?"]
+    [White "209joey"]
+    [Black "TheRealYzb25"]
+    [Result "0-1"]
+    [ECO "A00"]
+    [WhiteElo "533"]
+    [BlackElo "706"]
+    [TimeControl "600"]
+    [EndTime "11:53:54 PST"]
+    [Termination "TheRealYzb25 won by checkmate"]
+
+    1. g4 e5 2. Bg2 Bb4 3. Nc3 Nf6 4. a3 Ba5 5. g5 Ng4 6. f3 Qxg5 7. fxg4 Qxg4 8. h3
+    Qxg2 9. Rh2 Qxg1# 0-1'''
+
+    game = Chess_game(chess_data)
+
+    print(chess_data)
+    print(game.i_was_white)
+    print(game.did_i_win)
+    print(game.ending_tag)
+    print(game.date)
+    print(game.list_of_moves)
 
