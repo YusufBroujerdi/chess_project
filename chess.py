@@ -407,12 +407,14 @@ class Line_space(collections.abc.MutableSet):
     name : str
     is_white : bool
     lines : set
+    u_num : int
 
 
     def __init__(self, name, is_white, lines):
 
         self.name = name
         self.is_white = is_white
+        self.u_num = 0
 
         #For any line in the line space, all its sub-lines should also be present.
         take_sub_lines = lambda line : { line[:n] for n in range(len(line) + 1) }
@@ -431,6 +433,12 @@ class Line_space(collections.abc.MutableSet):
     def filter_for_length(self, length : int):
 
         return {line[:length] for line in self.lines if len(line) >= length}
+    
+
+
+    def get_continuations(self, line):
+
+        return {l for l in self.filter_for_length(len(line) + 1) if l[:len(line)] == line}
     
 
 
@@ -478,12 +486,11 @@ class Line_space(collections.abc.MutableSet):
 class Unique_line_space(Line_space):
     """Object for holding data about preferred chess line, but a single unique response to each opponent move is necessitated, for moves greater than a certain "uniqueness_number"."""
 
-    u_num : int
 
     def __init__(self, name, is_white, lines, uniqueness_number):
         
         super().__init__(name, is_white, lines)
-        self.u_num = uniqueness_number
+        super().u_num = uniqueness_number
 
         uniqueness_iter = iter(line for line in super().lines if not self.check_uniqueness(line))
 
@@ -497,11 +504,12 @@ class Unique_line_space(Line_space):
     def add(self, line):
 
         super().add(line)
-        uniqueness_iter = next(l for l in super().lines if not self.check_uniqueness(l) and l != line)
+        subline_of = lambda l, m : any(m[0:n] == l for n in range(len(m)) + 1)
+        uniqueness_iter = iter(l for l in super().lines if not self.check_uniqueness(l) and not subline_of(l, line))
 
         while True:
 
-            try: super().discard(uniqueness_iter)
+            try: super().discard(next(uniqueness_iter))
             except: break
     
 
@@ -513,10 +521,22 @@ class Unique_line_space(Line_space):
 
         for move_num in range(len(line)):
             if uniqueness_is_needed(move_num) and is_opponent_turn(move_num):
-                if len({l for l in super().lines if len(l) == move_num + 1 and l[:move_num] == line}) > 1:
+                if len( {l for l in super().lines if len(l) == move_num + 1 and l[:move_num] == line} ) > 1:
                     return False
         
         return True
+    
+
+    def find_contradicting_line(self, line):
+
+        uniqueness_is_needed = lambda num : divmod(num, 2)[0] + 1 >= self.u_num
+        
+        for move_num in range(len(line)):
+            if uniqueness_is_needed(move_num) and super().is_your_turn(move_num):
+                if not self.get_continuations(line[:move_num]).issubset({line[:move_num + 1]}):
+                    return next( iter( self.get_continuations(line[:move_num]) ) )
+
+        return None
 
 
 
@@ -565,6 +585,8 @@ class Node(Data_tree):
 class Node_traverser:
 
     node : Node
+    default_line_space : Line_space
+    default_book : Book
 
 
     def __init__(self, data):
@@ -577,28 +599,34 @@ class Node_traverser:
 
     
 
-    def loop_menu(self):
+    def get_option_choice(self, options):
 
-        menu_options = metadata.menu_options
+        for option in options.keys():
+            print(f'Enter {option} to {options[option]}.\n\n')
+        
+        response = input()
+        return response
+
+    
+    
+    def loop_menu(self):
 
         while True:
 
-            for option in menu_options.keys():
-                print(f'Enter {option} to {menu_options[option]}.\n\n')
-
-            response = input()
-
-            match response:
+            match self.get_option_choice(metadata.menu_options):
 
                 case 1:
                     self.configure_line_space()
-
                 case 2:
                     self.configure_book()
-
                 case 3:
                     self.navigate_to_new()
-
+                case 4:
+                    self.switch_default_line_space()
+                case 5:
+                    self.switch_default_book()
+                case 6:
+                    break
                 case _:
                     print('Input not recognized. Enter a number for the corresponding option.\n\n')
                     continue
@@ -606,14 +634,66 @@ class Node_traverser:
     
 
     def configure_line_space(self):
-        pass
 
+
+        if self.default_line_space is None:
+            print(f'Default line space to configure has not been selected yet.')
+
+
+        elif self.node.address in self.default_line_space:
+
+            print(f'Would you like to remove this line from the line space {self.default_line_space.name}?\n\n')
+
+            while True:
+
+                match self.get_option_choice(metadata.line_space_remove_options):
+
+                    case 1:
+                        self.default_line_space.remove(self.node.address)
+                        print("Line removed from line space.\n\n")
+                        break
+                    
+                    case 2:
+                        print("Nothing was changed.")
+                        break
+                    
+                    case _:
+                        print('Input not recognized. Enter a number for the corresponding option.\n\n')
+        
+
+        else:
+
+            print(f'Would you like to add this line to line space? {self.default_line_space.name}\n\n')
+
+            while True:
+
+                match self.get_option_choice(metadata.line_space_add_options):
+
+                    case 1:
+                        self.default_line_space.remove(self.node.address)
+                        print("Line added to line space.\n\n")
+                        break
+                    
+                    case 2:
+                        print("Nothing was changed.")
+                        break
+                    
+                    case _:
+                        print('Input not recognized. Enter a number for the corresponding option.\n\n')                
 
     def configure_book(self):
         pass
 
 
     def navigate_to_new(self):
+        pass
+
+
+    def switch_default_line_space():
+        pass
+
+
+    def switch_default_book():
         pass
 
 
@@ -674,5 +754,7 @@ if __name__ == '__main__':
 
     print(x == y)
     print(len(myset))
+
+    print(x[3])
     
 
